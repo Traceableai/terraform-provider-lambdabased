@@ -39,8 +39,8 @@ func createProvider(configureContextFunc schema.ConfigureContextFunc) *schema.Pr
 			"assume_role_name": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Default:     "OrganizationAccountAccessRole",
-				Description: "Name of the IAM role to assume in the target account. Defaults to OrganizationAccountAccessRole.",
+				Default:     "",
+				Description: "Name of the IAM role to assume in the target account. Required when account is specified.",
 			},
 			"assume_role": {
 				Type:     schema.TypeList,
@@ -75,9 +75,10 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 		return nil, diag.FromErr(err)
 	}
 
-	// If account is specified, assume role in that account
-	if account := d.Get("account").(string); account != "" {
-		roleName := d.Get("assume_role_name").(string)
+	// If account and assume_role_name are specified, assume role in that account
+	account := d.Get("account").(string)
+	roleName := d.Get("assume_role_name").(string)
+	if account != "" && roleName != "" {
 		roleArn := fmt.Sprintf("arn:aws:iam::%s:role/%s", account, roleName)
 		stsSvc := sts.NewFromConfig(cfg)
 		creds := stscreds.NewAssumeRoleProvider(stsSvc, roleArn)
