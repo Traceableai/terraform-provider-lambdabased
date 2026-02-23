@@ -8,6 +8,8 @@ terraform {
 
 provider "lambdabased" {
   region = "us-east-1"
+  # account = "123456789012"  # Optional: AWS account ID to assume role in
+  # assume_role_name = "OrganizationAccountAccessRole"  # Optional: Role name to assume (defaults to OrganizationAccountAccessRole)
 }
 
 locals {

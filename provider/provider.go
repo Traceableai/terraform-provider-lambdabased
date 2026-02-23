@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -28,6 +29,18 @@ func createProvider(configureContextFunc schema.ConfigureContextFunc) *schema.Pr
 				Type:     schema.TypeString,
 				Optional: true,
 				Default:  "",
+			},
+			"account": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "",
+				Description: "AWS account ID to assume role in. If not specified, uses default credentials.",
+			},
+			"assume_role_name": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "OrganizationAccountAccessRole",
+				Description: "Name of the IAM role to assume in the target account. Defaults to OrganizationAccountAccessRole.",
 			},
 			"assume_role": {
 				Type:     schema.TypeList,
@@ -62,13 +75,22 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 		return nil, diag.FromErr(err)
 	}
 
-	if assumeRoleRaw, ok := d.GetOk("assume_role"); ok {
+	// If account is specified, assume role in that account
+	if account := d.Get("account").(string); account != "" {
+		roleName := d.Get("assume_role_name").(string)
+		roleArn := fmt.Sprintf("arn:aws:iam::%s:role/%s", account, roleName)
+		stsSvc := sts.NewFromConfig(cfg)
+		creds := stscreds.NewAssumeRoleProvider(stsSvc, roleArn)
+		cfg.Credentials = aws.NewCredentialsCache(creds)
+	} else if assumeRoleRaw, ok := d.GetOk("assume_role"); ok {
+		// Fallback to explicit assume_role if provided
 		assumeRole := assumeRoleRaw.([]interface{})[0]
 		role := assumeRole.(map[string]interface{})["role_arn"].(string)
 		stsSvc := sts.NewFromConfig(cfg)
 		creds := stscreds.NewAssumeRoleProvider(stsSvc, role)
 		cfg.Credentials = aws.NewCredentialsCache(creds)
 	}
+	// If neither account nor assume_role is specified, use default credentials
 
 	return lambda.NewFromConfig(cfg), nil
 }
